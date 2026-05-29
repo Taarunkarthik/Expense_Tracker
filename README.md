@@ -14,3 +14,7 @@ A full-stack expense tracker for monthly budgeting and expense maintenance.
 - `npm run build` - build both apps
 - `npm run lint` - lint both apps
 - `npm run typecheck` - typecheck both apps
+
+## Overview
+
+Basic expense tracking for people who want to manage monthly spending, budgets, and recurring bills.
