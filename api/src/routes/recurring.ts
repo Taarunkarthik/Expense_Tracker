@@ -38,7 +38,7 @@ recurringRouter.get("/", requireUser, async (req: AuthedRequest, res) => {
     nextRunAt: item.nextRunAt.toISOString(),
     active: item.active,
     categoryId: item.categoryId,
-    category: item.category,
+    category: item.category ?? null,
   })) });
 });
 
@@ -70,13 +70,14 @@ recurringRouter.post("/", requireUser, async (req: AuthedRequest, res) => {
     nextRunAt: recurring.nextRunAt.toISOString(),
     active: recurring.active,
     categoryId: recurring.categoryId,
-    category: recurring.category,
+    category: recurring.category ?? null,
   } });
 });
 
 recurringRouter.patch("/:id", requireUser, async (req: AuthedRequest, res) => {
+  const id = String(req.params.id);
   const existing = await prisma.recurringExpense.findFirst({
-    where: { id: req.params.id, userId: req.user!.userId },
+    where: { id, userId: req.user!.userId },
   });
 
   if (!existing) {
@@ -91,7 +92,7 @@ recurringRouter.patch("/:id", requireUser, async (req: AuthedRequest, res) => {
   }
 
   const recurring = await prisma.recurringExpense.update({
-    where: { id: req.params.id },
+    where: { id },
     data: {
       ...(parsed.data.title ? { title: parsed.data.title } : {}),
       ...(parsed.data.amount !== undefined ? { amount: parsed.data.amount } : {}),
@@ -111,13 +112,14 @@ recurringRouter.patch("/:id", requireUser, async (req: AuthedRequest, res) => {
     nextRunAt: recurring.nextRunAt.toISOString(),
     active: recurring.active,
     categoryId: recurring.categoryId,
-    category: recurring.category,
+    category: recurring.category ?? null,
   } });
 });
 
 recurringRouter.delete("/:id", requireUser, async (req: AuthedRequest, res) => {
+  const id = String(req.params.id);
   const existing = await prisma.recurringExpense.findFirst({
-    where: { id: req.params.id, userId: req.user!.userId },
+    where: { id, userId: req.user!.userId },
   });
 
   if (!existing) {
@@ -125,6 +127,6 @@ recurringRouter.delete("/:id", requireUser, async (req: AuthedRequest, res) => {
     return;
   }
 
-  await prisma.recurringExpense.delete({ where: { id: req.params.id } });
+  await prisma.recurringExpense.delete({ where: { id } });
   res.status(204).send();
 });

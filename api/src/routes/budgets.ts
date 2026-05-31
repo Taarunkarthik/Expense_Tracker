@@ -74,8 +74,9 @@ budgetsRouter.post("/", requireUser, async (req: AuthedRequest, res) => {
 });
 
 budgetsRouter.delete("/:id", requireUser, async (req: AuthedRequest, res) => {
+  const id = String(req.params.id);
   const existing = await prisma.budget.findFirst({
-    where: { id: req.params.id, userId: req.user!.userId },
+    where: { id, userId: req.user!.userId },
   });
 
   if (!existing) {
@@ -83,6 +84,6 @@ budgetsRouter.delete("/:id", requireUser, async (req: AuthedRequest, res) => {
     return;
   }
 
-  await prisma.budget.delete({ where: { id: req.params.id } });
+  await prisma.budget.delete({ where: { id } });
   res.status(204).send();
 });

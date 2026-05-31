@@ -28,7 +28,7 @@ function serializeExpense(expense: {
   spentAt: Date;
   note: string | null;
   categoryId: string | null;
-  category: { id: string; name: string; color: string } | null;
+  category?: { id: string; name: string; color: string } | null;
 }) {
   return {
     id: expense.id,
@@ -37,7 +37,7 @@ function serializeExpense(expense: {
     spentAt: expense.spentAt.toISOString(),
     note: expense.note,
     categoryId: expense.categoryId,
-    category: expense.category,
+    category: expense.category ?? null,
   };
 }
 
@@ -86,8 +86,9 @@ expensesRouter.put("/:id", requireUser, async (req: AuthedRequest, res) => {
     return;
   }
 
+  const id = String(req.params.id);
   const existing = await prisma.expense.findFirst({
-    where: { id: req.params.id, userId: req.user!.userId },
+    where: { id, userId: req.user!.userId },
   });
 
   if (!existing) {
@@ -96,7 +97,7 @@ expensesRouter.put("/:id", requireUser, async (req: AuthedRequest, res) => {
   }
 
   const expense = await prisma.expense.update({
-    where: { id: req.params.id },
+    where: { id },
     data: {
       title: parsed.data.title,
       amount: parsed.data.amount,
@@ -111,8 +112,9 @@ expensesRouter.put("/:id", requireUser, async (req: AuthedRequest, res) => {
 });
 
 expensesRouter.delete("/:id", requireUser, async (req: AuthedRequest, res) => {
+  const id = String(req.params.id);
   const existing = await prisma.expense.findFirst({
-    where: { id: req.params.id, userId: req.user!.userId },
+    where: { id, userId: req.user!.userId },
   });
 
   if (!existing) {
@@ -120,6 +122,6 @@ expensesRouter.delete("/:id", requireUser, async (req: AuthedRequest, res) => {
     return;
   }
 
-  await prisma.expense.delete({ where: { id: req.params.id } });
+  await prisma.expense.delete({ where: { id } });
   res.status(204).send();
 });
