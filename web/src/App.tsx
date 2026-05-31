@@ -35,6 +35,11 @@ type RecurringFormState = {
 
 const currentMonth = new Date().toISOString().slice(0, 7);
 const today = new Date().toISOString().slice(0, 10);
+const guestUser: AuthUser = {
+  id: "guest",
+  name: "Guest",
+  email: "guest@example.com",
+};
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
@@ -57,6 +62,7 @@ export default function App() {
   const [auth, setAuth] = useState<AuthState>({ name: "", email: "", password: "" });
   const [token, setToken] = useState<string | null>(localStorage.getItem("expense-tracker-token"));
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [guestMode, setGuestMode] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -99,6 +105,7 @@ export default function App() {
       try {
         const response = await api.get<{ user: AuthUser }>("/auth/me", token);
         if (!active) return;
+        setGuestMode(false);
         setUser(response.user);
         await loadDashboard(token, month);
       } catch (error) {
@@ -121,15 +128,43 @@ export default function App() {
   useEffect(() => {
     if (user && token) {
       void loadDashboard(token, month);
+    } else if (guestMode && user) {
+      void loadDashboard(null, month);
     }
-  }, [month, token, user]);
+  }, [month, token, user, guestMode]);
 
-  async function loadDashboard(sessionToken: string, selectedMonth: string) {
+  async function loadDashboard(sessionToken: string | null, selectedMonth: string) {
     setLoading(true);
     try {
-      const [summaryResponse, categoriesResponse, expensesResponse, budgetsResponse, recurringResponse] = await Promise.all([
+      const categoriesResponse = await api.get<{ categories: Category[] }>("/categories");
+
+      if (!sessionToken) {
+        setSummary({
+          month: selectedMonth,
+          totalSpent: 0,
+          totalBudget: 0,
+          remainingBudget: 0,
+          categoryBreakdown: [],
+          recurringCount: 0,
+        });
+        setCategories(categoriesResponse.categories);
+        setExpenses([]);
+        setBudgets([]);
+        setRecurring([]);
+        if (!budgetForm.categoryId && categoriesResponse.categories[0]) {
+          setBudgetForm((current) => ({ ...current, categoryId: categoriesResponse.categories[0].id }));
+        }
+        if (!expenseForm.categoryId && categoriesResponse.categories[0]) {
+          setExpenseForm((current) => ({ ...current, categoryId: categoriesResponse.categories[0].id }));
+        }
+        if (!recurringForm.categoryId && categoriesResponse.categories[0]) {
+          setRecurringForm((current) => ({ ...current, categoryId: categoriesResponse.categories[0].id }));
+        }
+        return;
+      }
+
+      const [summaryResponse, expensesResponse, budgetsResponse, recurringResponse] = await Promise.all([
         api.get<{ summary: DashboardSummary }>(`/dashboard/summary?month=${selectedMonth}`, sessionToken),
-        api.get<{ categories: Category[] }>("/categories", sessionToken),
         api.get<{ expenses: Expense[] }>(`/expenses?month=${selectedMonth}`, sessionToken),
         api.get<{ budgets: Budget[] }>(`/budgets?month=${selectedMonth}`, sessionToken),
         api.get<{ recurring: RecurringExpense[] }>("/recurring", sessionToken),
@@ -168,6 +203,7 @@ export default function App() {
             password: auth.password,
           });
 
+      setGuestMode(false);
       localStorage.setItem("expense-tracker-token", response.token);
       setToken(response.token);
       setUser(response.user);
@@ -175,6 +211,15 @@ export default function App() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Authentication failed");
     }
+  }
+
+  async function continueAsGuest() {
+    setMessage("Browsing as a guest. Sign in to save data.");
+    setGuestMode(true);
+    setToken(null);
+    localStorage.removeItem("expense-tracker-token");
+    setUser(guestUser);
+    await loadDashboard(null, month);
   }
 
   async function handleExpenseSubmit(event: FormEvent) {
@@ -314,6 +359,7 @@ export default function App() {
     localStorage.removeItem("expense-tracker-token");
     setToken(null);
     setUser(null);
+    setGuestMode(false);
     setSummary(null);
     setExpenses([]);
     setBudgets([]);
@@ -337,6 +383,14 @@ export default function App() {
         </div>
 
         <form className="card auth-card" onSubmit={handleAuthSubmit}>
+          <button type="button" className="primary" onClick={() => void continueAsGuest()}>
+            Continue as guest
+          </button>
+
+          <p className="message">
+            Guest mode opens the app without an account. You can browse the dashboard, then sign in when you want to save changes.
+          </p>
+
           <div className="toggle-row">
             <button type="button" className={authMode === "login" ? "toggle active" : "toggle"} onClick={() => setAuthMode("login")}>Login</button>
             <button type="button" className={authMode === "register" ? "toggle active" : "toggle"} onClick={() => setAuthMode("register")}>Register</button>
@@ -374,8 +428,8 @@ export default function App() {
       <header className="topbar card">
         <div>
           <p className="eyebrow">Expense Tracker</p>
-          <h1>Hello, {user.name}</h1>
-          <p>Keep every month organized from one workspace.</p>
+          <h1>Hello, {guestMode ? "Guest" : user.name}</h1>
+          <p>{guestMode ? "Browse the dashboard first, then sign in to save your own data." : "Keep every month organized from one workspace."}</p>
         </div>
 
         <div className="topbar-actions">
@@ -383,8 +437,10 @@ export default function App() {
             Month
             <input type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
           </label>
+          {guestMode
+            ? <button className="ghost" type="button" onClick={signOut}>Back to login</button>
+            : <button className="ghost" type="button" onClick={signOut}>Sign out</button>}
           <button className="ghost" type="button" onClick={exportCsv}>Export CSV</button>
-          <button className="ghost" type="button" onClick={signOut}>Sign out</button>
         </div>
       </header>
 

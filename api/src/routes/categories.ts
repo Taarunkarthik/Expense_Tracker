@@ -10,7 +10,7 @@ const categorySchema = z.object({
   color: z.string().min(4).default("#4f46e5"),
 });
 
-categoriesRouter.get("/", requireUser, async (_req, res) => {
+categoriesRouter.get("/", async (_req, res) => {
   const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
   res.json({ categories });
 });

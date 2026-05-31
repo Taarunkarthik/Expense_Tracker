@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { requireUser, type AuthedRequest } from "../middleware/auth.js";
+import { getOptionalUser, requireUser, type AuthedRequest } from "../middleware/auth.js";
 
 export const recurringRouter = Router();
 
@@ -14,9 +14,16 @@ const recurringSchema = z.object({
   active: z.boolean().optional(),
 });
 
-recurringRouter.get("/", requireUser, async (req: AuthedRequest, res) => {
+recurringRouter.get("/", async (req: AuthedRequest, res) => {
+  const user = getOptionalUser(req);
+
+  if (!user) {
+    res.json({ recurring: [] });
+    return;
+  }
+
   const recurring = await prisma.recurringExpense.findMany({
-    where: { userId: req.user!.userId },
+    where: { userId: user.userId },
     include: { category: true },
     orderBy: { updatedAt: "desc" },
   });

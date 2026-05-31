@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { requireUser, type AuthedRequest } from "../middleware/auth.js";
+import { getOptionalUser, requireUser, type AuthedRequest } from "../middleware/auth.js";
 
 export const budgetsRouter = Router();
 
@@ -11,13 +11,20 @@ const budgetSchema = z.object({
   amount: z.union([z.number(), z.string()]).transform((value) => Number(value)),
 });
 
-budgetsRouter.get("/", requireUser, async (req: AuthedRequest, res) => {
+budgetsRouter.get("/", async (req: AuthedRequest, res) => {
   const month = typeof req.query.month === "string" && /^\d{4}-\d{2}$/.test(req.query.month)
     ? req.query.month
     : new Date().toISOString().slice(0, 7);
 
+  const user = getOptionalUser(req);
+
+  if (!user) {
+    res.json({ budgets: [] });
+    return;
+  }
+
   const budgets = await prisma.budget.findMany({
-    where: { userId: req.user!.userId, month },
+    where: { userId: user.userId, month },
     include: { category: true },
     orderBy: { updatedAt: "desc" },
   });

@@ -1,7 +1,6 @@
-import { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
-import { requireUser, type AuthedRequest } from "../middleware/auth.js";
+import { getOptionalUser, type AuthedRequest } from "../middleware/auth.js";
 
 export const dashboardRouter = Router();
 
@@ -13,21 +12,36 @@ function monthRange(month?: string) {
   return { month: value, start, end };
 }
 
-dashboardRouter.get("/summary", requireUser, async (req: AuthedRequest, res) => {
+dashboardRouter.get("/summary", async (req: AuthedRequest, res) => {
   const requestedMonth = typeof req.query.month === "string" ? req.query.month : undefined;
   const { month, start, end } = monthRange(requestedMonth);
+  const user = getOptionalUser(req);
+
+  if (!user) {
+    res.json({
+      summary: {
+        month,
+        totalSpent: 0,
+        totalBudget: 0,
+        remainingBudget: 0,
+        recurringCount: 0,
+        categoryBreakdown: [],
+      },
+    });
+    return;
+  }
 
   const [expenses, budgets, recurring] = await Promise.all([
     prisma.expense.findMany({
-      where: { userId: req.user!.userId, spentAt: { gte: start, lt: end } },
+      where: { userId: user.userId, spentAt: { gte: start, lt: end } },
       include: { category: true },
     }),
     prisma.budget.findMany({
-      where: { userId: req.user!.userId, month },
+      where: { userId: user.userId, month },
       include: { category: true },
     }),
     prisma.recurringExpense.count({
-      where: { userId: req.user!.userId, active: true },
+      where: { userId: user.userId, active: true },
     }),
   ]);
 

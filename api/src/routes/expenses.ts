@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { requireUser, type AuthedRequest } from "../middleware/auth.js";
+import { getOptionalUser, requireUser, type AuthedRequest } from "../middleware/auth.js";
 
 export const expensesRouter = Router();
 
@@ -41,13 +41,19 @@ function serializeExpense(expense: {
   };
 }
 
-expensesRouter.get("/", requireUser, async (req: AuthedRequest, res) => {
+expensesRouter.get("/", async (req: AuthedRequest, res) => {
   const requestedMonth = typeof req.query.month === "string" ? req.query.month : undefined;
   const { month, start, end } = monthRange(requestedMonth);
+  const user = getOptionalUser(req);
+
+  if (!user) {
+    res.json({ month, expenses: [] });
+    return;
+  }
 
   const expenses = await prisma.expense.findMany({
     where: {
-      userId: req.user!.userId,
+      userId: user.userId,
       spentAt: { gte: start, lt: end },
     },
     include: { category: true },
